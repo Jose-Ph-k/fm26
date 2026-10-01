@@ -1,41 +1,381 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b1020"><meta name="apple-mobile-web-app-capable" content="yes">
-<title>FM26 Scout AI</title><link rel="manifest" href="/manifest.webmanifest">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>FM26 Scout V3</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f6f7fb;background:#090e1d}
-body{margin:0}.wrap{max-width:820px;margin:auto;padding:28px 18px 80px}.card{background:#141b31;border:1px solid #2c3655;border-radius:20px;padding:20px;margin:16px 0}
-h1{margin:0 0 5px}h2{margin-top:0}.muted{color:#9da9c5}.drop{display:block;padding:18px;border:1px dashed #506083;border-radius:14px;text-align:center}
-input{width:100%}img{width:100%;max-height:480px;object-fit:contain;border-radius:14px;margin-top:14px;background:#090e1d}
-button{width:100%;padding:15px;border:0;border-radius:13px;background:#2859e8;color:white;font-size:17px;font-weight:700;margin-top:14px}
-button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.pill{background:#0e1528;padding:12px;border-radius:12px}
-pre{white-space:pre-wrap;font:inherit;line-height:1.55}.good{color:#72e5a3}.warn{color:#ffd36b}
-@media(max-width:600px){.grid{grid-template-columns:1fr}}
-</style></head>
-<body><main class="wrap">
-<h1>FM26 Scout AI <small>V2</small></h1><div class="muted">선수 캡처 → AI 자동 판독 → 스카우팅 보고서</div>
-<section class="card"><h2>1. 선수 캡처</h2>
-<label class="drop">FM26 선수 프로필 캡처 선택<input id="file" type="file" accept="image/*"></label>
-<img id="preview" hidden><button id="go" disabled>AI 분석하기</button><div id="status" class="muted"></div></section>
-<section class="card" id="result" hidden><h2>2. AI 스카우팅 보고서</h2><div id="facts" class="grid"></div><h3>판단</h3><pre id="report"></pre></section>
+:root{
+  --bg:#090e1d;--panel:#141b31;--panel2:#0e1528;--line:#2d3959;--text:#f6f7fb;
+  --muted:#9da9c5;--blue:#3567f0;--green:#7ce8a9;--yellow:#ffd76a;--red:#ff7474;--purple:#9e56ff
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:auto;padding:22px 16px 80px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:5px 0 16px}
+h1{font-size:26px;margin:0} h2{font-size:19px;margin:0 0 14px} h3{font-size:16px;margin:18px 0 10px}
+small,.muted{color:var(--muted)}
+.badge{display:inline-block;padding:5px 9px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px;margin:14px 0}
+.drop{display:block;border:1px dashed #536383;border-radius:14px;padding:18px;text-align:center;cursor:pointer}
+.drop input{display:block;width:100%;margin-top:10px}
+.previewWrap{position:relative;margin-top:14px;background:#070b16;border-radius:14px;overflow:hidden}
+#preview{display:block;width:100%;height:auto}
+#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+button{border:0;border-radius:12px;padding:13px 14px;font-size:16px;font-weight:700;background:var(--blue);color:#fff}
+button.secondary{background:#232d49} button.ghost{background:transparent;border:1px solid var(--line)}
+button:disabled{opacity:.5}
+#status{margin-top:10px;min-height:22px;color:var(--muted)}
+.progress{height:8px;border-radius:999px;background:#0b1122;overflow:hidden;margin-top:8px}
+.progress>i{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.field{background:var(--panel2);padding:10px;border-radius:11px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+.field input,.field select{width:100%;border:1px solid #32405f;background:#0b1122;color:#fff;border-radius:8px;padding:8px;font-size:14px}
+.typebar{display:flex;gap:8px;margin-bottom:12px}.typebar button{flex:1}
+.typebar button.active{outline:2px solid var(--purple);background:#392064}
+.attrCols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.attrCol{background:var(--panel2);padding:10px;border-radius:12px}
+.attrRow{display:grid;grid-template-columns:1fr 60px;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.045)}
+.attrRow:last-child{border-bottom:0}.attrRow span{font-size:13px;color:#d7dced}
+.attrRow input{width:60px;text-align:center;background:#0a1020;color:#fff;border:1px solid #303d5b;border-radius:7px;padding:6px}
+.role{display:grid;grid-template-columns:1fr 54px;gap:10px;align-items:center;margin:8px 0}
+.meter{height:9px;background:#0b1122;border-radius:999px;overflow:hidden;margin-top:4px}.meter i{display:block;height:100%;background:linear-gradient(90deg,#355ff0,#7ce8a9)}
+.score{text-align:right;font-weight:800}
+.report{white-space:pre-wrap;line-height:1.65;background:var(--panel2);padding:14px;border-radius:12px}
+.good{color:var(--green)}.warn{color:var(--yellow)}.bad{color:var(--red)}
+details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
+.notice{font-size:12px;line-height:1.5;color:var(--muted);margin-top:10px}
+@media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.attrCols{grid-template-columns:1fr}.actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header>
+  <div><h1>FM26 Scout V3</h1><div class="muted">iPad 2732×2048 고정 좌표 판독 · 무료 · 이미지 외부 업로드 없음</div></div>
+  <span class="badge">FIXED 2732×2048</span>
+</header>
+
+<section class="card">
+  <h2>1. 선수 스크린샷</h2>
+  <label class="drop">FM26 선수 보고서 → 개요 화면 캡처 선택
+    <input id="file" type="file" accept="image/*">
+  </label>
+  <div class="previewWrap" id="previewWrap" hidden>
+    <img id="preview" alt="">
+    <canvas id="overlay"></canvas>
+  </div>
+  <div class="actions">
+    <button id="scan" disabled>고정 좌표 판독</button>
+    <button id="showBoxes" class="secondary" disabled>판독 위치 보기</button>
+  </div>
+  <div id="status">스크린샷을 선택하세요.</div>
+  <div class="progress"><i id="bar"></i></div>
+  <div class="notice">능력치 이름은 OCR하지 않습니다. 정해진 위치의 숫자 칸만 읽습니다. 2732×2048이 아니어도 같은 4:3 화면이면 비율 보정하지만, 정확도는 원본 해상도가 가장 높습니다.</div>
+</section>
+
+<section class="card" id="metaCard" hidden>
+  <h2>2. 자동 판독 결과 확인</h2>
+  <div class="typebar">
+    <button id="fieldBtn" class="secondary">필드 선수</button>
+    <button id="gkBtn" class="secondary">골키퍼</button>
+  </div>
+  <div class="grid">
+    <div class="field"><label>이름</label><input id="name" placeholder="자동 판독 / 직접 수정"></div>
+    <div class="field"><label>나이</label><input id="age" type="number" min="15" max="50"></div>
+    <div class="field"><label>포지션</label><input id="position" placeholder="예: ST (C), D/WB (L), GK"></div>
+    <div class="field"><label>국가 코드</label><input id="nation" placeholder="예: POR"></div>
+    <div class="field"><label>시장가치(억원, 선택)</label><input id="value" inputmode="decimal"></div>
+    <div class="field"><label>신장(cm, 선택)</label><input id="height" inputmode="numeric"></div>
+    <div class="field"><label>현재 별점(직접 입력 가능)</label><input id="currentStars" inputmode="decimal" placeholder="예: 3.5"></div>
+    <div class="field"><label>잠재 별점(직접 입력 가능)</label><input id="potentialStars" inputmode="decimal" placeholder="예: 4.5"></div>
+  </div>
+  <details><summary>상단 정보는 왜 일부만 자동인가?</summary><p class="notice">무료·빠른 판독을 위해 숫자 능력치는 고정 좌표 숫자 OCR을 사용하고, 이름·포지션처럼 문자 인식이 필요한 부분만 영어 OCR을 사용합니다. 한국어 클럽명/성격은 분석 필수값이 아니므로 자동 OCR 대상에서 제외했습니다.</p></details>
+</section>
+
+<section class="card" id="attrsCard" hidden>
+  <h2>3. 능력치 <small>잘못 읽힌 숫자는 바로 수정 가능</small></h2>
+  <div class="attrCols" id="attrs"></div>
+  <div class="actions"><button id="analyze">스카우팅 계산</button><button id="rescan" class="secondary">숫자 다시 읽기</button></div>
+</section>
+
+<section class="card" id="reportCard" hidden>
+  <h2>4. 스카우팅 보고서</h2>
+  <div id="level" class="badge"></div>
+  <h3>역할 적합도</h3>
+  <div id="roles"></div>
+  <h3>판단</h3>
+  <div id="report" class="report"></div>
+  <div class="actions"><button id="copy" class="secondary">보고서 복사</button><button id="save" class="ghost">기기에 저장</button></div>
+</section>
 </main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
-const f=document.querySelector('#file'), p=document.querySelector('#preview'), go=document.querySelector('#go'),
-status=document.querySelector('#status'), result=document.querySelector('#result'), facts=document.querySelector('#facts'), report=document.querySelector('#report');
-let dataUrl="";
-f.onchange=()=>{const file=f.files[0]; if(!file)return; const r=new FileReader();r.onload=()=>{dataUrl=r.result;p.src=dataUrl;p.hidden=false;go.disabled=false;result.hidden=true};r.readAsDataURL(file)};
-go.onclick=async()=>{go.disabled=true;status.textContent="이미지를 읽고 있습니다…";try{
- const res=await fetch('/api/analyze',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({image:dataUrl})});
- const d=await res.json();if(!res.ok)throw new Error(d.error||"분석 실패");
- const x=d.player||{};facts.innerHTML=[
- ["이름",x.name],["나이",x.age],["국적",x.nationality],["포지션",x.position],["클럽",x.club],
- ["주발",x.foot],["키",x.height],["성격",x.personality],["현재 기량",x.current_level],["잠재력",x.potential]
- ].map(([a,b])=>`<div class="pill"><span class="muted">${a}</span><br><b>${b??"판독 불가"}</b></div>`).join("");
- report.textContent=[`결론: ${d.decision||"-"}`,`추천 역할: ${d.best_role||"-"}`,`장점: ${(d.strengths||[]).join(", ")||"-"}`,
- `약점: ${(d.weaknesses||[]).join(", ")||"-"}`,`영입/육성 판단: ${d.recruitment||"-"}`,`가격 판단: ${d.price_view||"-"}`,
- `CA 추정: ${d.ca_estimate||"정확한 숫자 추정 안 함"}`,`확신도: ${d.confidence||"-"}`,`메모: ${d.notes||"-"}`].join("\n\n");
- result.hidden=false;status.textContent="분석 완료";
-}catch(e){status.textContent="오류: "+e.message}finally{go.disabled=false}};
-</script></body></html>
+const BASE_W=2732, BASE_H=2048;
+const FIELD_TECH=['개인기','골 결정력','드리블','일대일 마크','중거리 슛','크로스','태클','패스','퍼스트 터치','헤더','세트피스','장거리 스로인','코너킥','페널티킥','프리킥'];
+const MENTAL=['대담성','리더십','수비 위치 선정','승부욕','시야','예측력','오프 더 볼','적극성','집중력','천재성','침착성','팀워크','판단력','활동량'];
+const PHYSICAL=['가속도','균형 감각','몸싸움','민첩성','점프 거리','주력','지구력','타고난 체력'];
+const GK_TECH=['골킥','공 던지기','공중 장악력','기행','돌진(빈도)','반사 신경','볼 핸들링','수비 조율','일대일 방어','패스','퍼스트 터치','펀칭(빈도)','페널티 박스 장악력'];
+
+const TEMPLATES={
+ field:{
+  tech:{x:1010,y0:788,w:70,h:46,step:48,n:15},
+  mental:{x:1543,y0:788,w:70,h:46,step:48,n:14},
+  physical:{x:2070,y0:788,w:72,h:46,step:48,n:8}
+ },
+ gk:{
+  tech:{x:1012,y0:789,w:70,h:42,step:43,n:13},
+  mental:{x:1543,y0:788,w:70,h:46,step:48,n:14},
+  physical:{x:2070,y0:788,w:72,h:46,step:48,n:8}
+ },
+ meta:{
+   name:{x:505,y:305,w:420,h:62},
+   position:{x:500,y:365,w:210,h:64},
+   age:{x:675,y:365,w:90,h:64},
+   nation:{x:510,y:438,w:150,h:58},
+   value:{x:1680,y:348,w:210,h:55},
+   height:{x:2250,y:878,w:130,h:55}
+ }
+};
+
+const $=s=>document.querySelector(s);
+const file=$('#file'), preview=$('#preview'), overlay=$('#overlay'), scan=$('#scan'), showBoxes=$('#showBoxes');
+const statusEl=$('#status'), bar=$('#bar'), metaCard=$('#metaCard'), attrsCard=$('#attrsCard'), attrsEl=$('#attrs');
+const reportCard=$('#reportCard'), rolesEl=$('#roles'), reportEl=$('#report'), levelEl=$('#level');
+let srcImg=null, mode='field', worker=null, boxesVisible=false, attrData={};
+
+function setProgress(p,msg){bar.style.width=Math.max(0,Math.min(100,p))+'%'; if(msg)statusEl.textContent=msg}
+function scaleRect(r){
+ const sx=srcImg.naturalWidth/BASE_W, sy=srcImg.naturalHeight/BASE_H;
+ return {x:r.x*sx,y:r.y*sy,w:r.w*sx,h:r.h*sy};
+}
+function makeCrop(rect,scale=4){
+ const r=scaleRect(rect), c=document.createElement('canvas');
+ c.width=Math.max(1,Math.round(r.w*scale)); c.height=Math.max(1,Math.round(r.h*scale));
+ const ctx=c.getContext('2d',{willReadFrequently:true});
+ ctx.imageSmoothingEnabled=false;
+ ctx.drawImage(srcImg,r.x,r.y,r.w,r.h,0,0,c.width,c.height);
+ return c;
+}
+function preprocessNumber(rect){
+ const c=makeCrop(rect,5),ctx=c.getContext('2d',{willReadFrequently:true});
+ const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;
+ let vals=[]; for(let i=0;i<d.length;i+=4) vals.push(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
+ vals.sort((a,b)=>a-b);
+ const med=vals[Math.floor(vals.length*.5)], hi=vals[Math.floor(vals.length*.9)];
+ const thr=Math.max(med+18,Math.min(145,(med+hi)*.56));
+ for(let i=0;i<d.length;i+=4){
+   const g=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+   const sat=Math.max(d[i],d[i+1],d[i+2])-Math.min(d[i],d[i+1],d[i+2]);
+   const bright=Math.max(d[i],d[i+1],d[i+2]);
+   const on=(g>thr)||(sat>55&&bright>135);
+   d[i]=d[i+1]=d[i+2]=on?255:0; d[i+3]=255;
+ }
+ ctx.putImageData(im,0,0); return c;
+}
+async function ensureWorker(){
+ if(worker) return worker;
+ if(!window.Tesseract) throw new Error('OCR 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');
+ setProgress(4,'무료 OCR 엔진을 준비하는 중…');
+ worker=await Tesseract.createWorker('eng',1,{logger:m=>{
+   if(m.status==='loading tesseract core'||m.status==='loading language traineddata'){
+     setProgress(4+Math.round((m.progress||0)*10),'OCR 엔진 최초 로딩 중…');
+   }
+ }});
+ return worker;
+}
+async function ocrCanvas(c, whitelist='0123456789', psm=8){
+ const w=await ensureWorker();
+ await w.setParameters({tessedit_char_whitelist:whitelist,tessedit_pageseg_mode:String(psm),preserve_interword_spaces:'1'});
+ const {data}=await w.recognize(c);
+ return (data.text||'').trim();
+}
+function parseNum(s,min=1,max=20){
+ const digs=(s||'').replace(/[^\d]/g,'');
+ if(!digs)return null;
+ let v=parseInt(digs,10);
+ if(v>=min&&v<=max)return v;
+ // common OCR merges; try final 1–2 chars
+ for(let len=2;len>=1;len--){let q=parseInt(digs.slice(-len),10);if(q>=min&&q<=max)return q}
+ return null;
+}
+async function readRows(spec,names,group,p0,p1){
+ const out={};
+ for(let i=0;i<spec.n;i++){
+   const y=spec.y0+i*spec.step;
+   const rect={x:spec.x,y,w:spec.w,h:spec.h};
+   const txt=await ocrCanvas(preprocessNumber(rect));
+   out[names[i]]=parseNum(txt);
+   const pct=p0+(p1-p0)*(i+1)/spec.n;
+   setProgress(pct,`${group} ${i+1}/${spec.n} · ${names[i]} = ${out[names[i]]??'?'}`);
+ }
+ return out;
+}
+async function readText(rect, whitelist, psm=7){
+ const c=makeCrop(rect,3), w=await ensureWorker();
+ await w.setParameters({tessedit_char_whitelist:whitelist||'',tessedit_pageseg_mode:String(psm)});
+ const {data}=await w.recognize(c); return (data.text||'').replace(/\n/g,' ').trim();
+}
+async function readMeta(){
+ try{
+   setProgress(12,'상단 정보 간단 판독 중…');
+   const name=await readText(TEMPLATES.meta.name,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'");
+   $('#name').value=name.replace(/[^A-Za-zÀ-ÿ .'\-]/g,'').trim();
+   const pos=await readText(TEMPLATES.meta.position,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()/,- ');
+   $('#position').value=pos.trim();
+   const ageText=await readText(TEMPLATES.meta.age,'0123456789');
+   const age=parseNum(ageText,15,50); if(age)$('#age').value=age;
+   const nation=await readText(TEMPLATES.meta.nation,'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+   $('#nation').value=nation.replace(/[^A-Z]/g,'').slice(0,3);
+   const val=await readText(TEMPLATES.meta.value,'0123456789,.');
+   $('#value').value=(val.match(/[\d,.]+/)||[''])[0];
+   const ht=await readText(TEMPLATES.meta.height,'0123456789');
+   const hv=parseNum(ht,140,220); if(hv)$('#height').value=hv;
+   const p=$('#position').value.toUpperCase();
+   if(/\bGK\b/.test(p)) setMode('gk'); else if(p) setMode('field');
+ }catch(e){ console.warn('meta OCR',e); }
+}
+async function scanAttributes(){
+ if(!srcImg)return;
+ scan.disabled=true; $('#rescan')&&( $('#rescan').disabled=true );
+ try{
+   await ensureWorker();
+   metaCard.hidden=false;
+   await readMeta();
+   const t=TEMPLATES[mode];
+   const techNames=mode==='gk'?GK_TECH:FIELD_TECH;
+   const tech=await readRows(t.tech,techNames,mode==='gk'?'골키퍼 능력':'기술',28,58);
+   const mental=await readRows(t.mental,MENTAL,'멘탈',58,82);
+   const physical=await readRows(t.physical,PHYSICAL,'신체',82,98);
+   attrData={...tech,...mental,...physical};
+   renderAttrs();
+   attrsCard.hidden=false;
+   setProgress(100,'판독 완료. 틀린 숫자가 있으면 수정한 뒤 스카우팅 계산을 누르세요.');
+ }catch(e){statusEl.textContent='오류: '+e.message;console.error(e)}
+ finally{scan.disabled=false;if($('#rescan'))$('#rescan').disabled=false}
+}
+function setMode(m){
+ mode=m; $('#fieldBtn').classList.toggle('active',m==='field');$('#gkBtn').classList.toggle('active',m==='gk');
+ if(attrsCard.hidden===false){attrData={};renderAttrs()}
+ if(boxesVisible)drawBoxes();
+}
+function renderAttrs(){
+ const cols=[
+   [mode==='gk'?'골키퍼':'기술',mode==='gk'?GK_TECH:FIELD_TECH],
+   ['멘탈',MENTAL],['신체',PHYSICAL]
+ ];
+ attrsEl.innerHTML=cols.map(([title,names])=>`<div class="attrCol"><b>${title}</b>${names.map(n=>`
+ <div class="attrRow"><span>${n}</span><input data-attr="${n}" type="number" min="1" max="20" value="${attrData[n]??''}" placeholder="?"></div>`).join('')}</div>`).join('');
+ attrsEl.querySelectorAll('input').forEach(i=>i.addEventListener('input',()=>{const v=+i.value;attrData[i.dataset.attr]=(v>=1&&v<=20)?v:null}));
+}
+function v(n){const x=+attrData[n];return x>=1&&x<=20?x:null}
+function weighted(weights){
+ let sum=0,ws=0;
+ for(const [n,w] of Object.entries(weights)){const x=v(n);if(x!=null){sum+=x*w;ws+=w}}
+ return ws?Math.round(sum/ws/20*100):0;
+}
+const ROLE_FIELD={
+ '어드밴스드 포워드':{'골 결정력':1.5,'오프 더 볼':1.3,'가속도':1.2,'주력':1.2,'예측력':1,'침착성':1.1,'퍼스트 터치':.8,'드리블':.8},
+ '컴플리트 포워드':{'골 결정력':1.2,'퍼스트 터치':1,'개인기':1,'패스':.8,'헤더':.8,'몸싸움':.9,'오프 더 볼':1,'판단력':.8,'침착성':1,'주력':.8},
+ '인사이드 포워드':{'골 결정력':1,'드리블':1.3,'퍼스트 터치':1,'오프 더 볼':1,'가속도':1.2,'주력':1.2,'천재성':.7,'침착성':.8},
+ '윙어':{'크로스':1.4,'드리블':1.3,'가속도':1.2,'주력':1.2,'퍼스트 터치':.8,'오프 더 볼':.8,'민첩성':.8,'활동량':.6},
+ '어드밴스드 플레이메이커':{'패스':1.4,'시야':1.4,'퍼스트 터치':1,'개인기':1,'판단력':1,'침착성':.9,'천재성':.8,'오프 더 볼':.6},
+ '박스 투 박스':{'패스':.8,'태클':.8,'판단력':1,'팀워크':1,'활동량':1.3,'지구력':1.3,'수비 위치 선정':.8,'오프 더 볼':.8},
+ '볼 위닝 미드필더':{'태클':1.5,'적극성':1.1,'활동량':1.3,'지구력':1.2,'수비 위치 선정':1,'판단력':.8,'몸싸움':1,'팀워크':.7},
+ '윙백':{'크로스':1.2,'태클':1,'가속도':1.1,'주력':1.1,'지구력':1.2,'활동량':1.1,'오프 더 볼':.7,'수비 위치 선정':.8},
+ '풀백':{'태클':1.3,'수비 위치 선정':1.3,'예측력':1,'판단력':1,'주력':.9,'지구력':.8,'팀워크':.8,'크로스':.6},
+ '센터백':{'일대일 마크':1.3,'태클':1.3,'헤더':1.1,'수비 위치 선정':1.4,'예측력':1,'판단력':1,'몸싸움':1,'점프 거리':1,'집중력':1}
+};
+const ROLE_GK={
+ '골키퍼':{'반사 신경':1.5,'일대일 방어':1.3,'볼 핸들링':1.2,'수비 위치 선정':1.2,'집중력':1,'민첩성':1,'페널티 박스 장악력':1,'공중 장악력':.8},
+ '스위퍼 키퍼':{'반사 신경':1,'일대일 방어':1,'돌진(빈도)':.9,'패스':1,'퍼스트 터치':.7,'판단력':1.2,'예측력':1.1,'가속도':.8,'주력':.8,'침착성':.8},
+ '빌드업 골키퍼':{'패스':1.5,'퍼스트 터치':1,'골킥':1.2,'공 던지기':1,'침착성':1.2,'시야':1.1,'판단력':1.1},
+ '박스 장악형':{'공중 장악력':1.4,'페널티 박스 장악력':1.5,'수비 조율':1.1,'리더십':.8,'점프 거리':1,'몸싸움':.8,'집중력':1}
+};
+function topStrengths(){
+ return Object.entries(attrData).filter(([,x])=>x!=null).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([n,x])=>`${n} ${x}`);
+}
+function topWeaknesses(){
+ return Object.entries(attrData).filter(([,x])=>x!=null).sort((a,b)=>a[1]-b[1]).slice(0,5).map(([n,x])=>`${n} ${x}`);
+}
+function levelFrom(s){return s>=86?'엘리트급 핵심 능력':s>=80?'상위권 주전급':s>=74?'강팀 로테이션~주전급':s>=68?'1군 로테이션급':s>=61?'백업/성장형':'추가 관찰 필요'}
+function recruitment(best,age){
+ if(!age)return '나이를 입력하면 영입 판단이 더 정확해집니다.';
+ if(age<=20&&best>=72)return '적극 영입 후보 — 어린 나이에 핵심 역할 점수가 높습니다. 1군 경쟁 또는 상위 리그 임대 육성이 적합합니다.';
+ if(age<=23&&best>=68)return '영입 후보 — 성장 연령대입니다. 출전시간 확보가 어렵다면 임대 육성을 우선합니다.';
+ if(age<=25&&best>=75)return '즉전감 영입 후보 — 25세 이하 원칙과 현재 기량을 모두 충족합니다.';
+ if(age<=25&&best>=66)return '가격이 적정하면 관찰/영입 검토 — 핵심 능력과 약점을 비교해 판단합니다.';
+ if(age>=30&&best<82)return '영입 우선순위 낮음 — 즉전감이 매우 확실한 경우가 아니라면 장기 가치가 낮습니다.';
+ if(age>=28&&best<76)return '매각/대체 자원 검토 구간 — 재판매 가치와 원금 회수를 함께 확인합니다.';
+ if(best>=80)return '즉전감 후보 — 나이보다 현재 전력 기여도를 중심으로 가격을 확인할 만합니다.';
+ return '관찰 유지 — 가격, 별점, 경기력 자료를 추가로 확인하는 편이 좋습니다.';
+}
+function analyze(){
+ const roles=mode==='gk'?ROLE_GK:ROLE_FIELD;
+ const scores=Object.entries(roles).map(([n,w])=>[n,weighted(w)]).sort((a,b)=>b[1]-a[1]);
+ const best=scores[0]?.[1]||0,age=+$('#age').value||null;
+ rolesEl.innerHTML=scores.slice(0,6).map(([n,s])=>`<div class="role"><div>${n}<div class="meter"><i style="width:${s}%"></i></div></div><div class="score">${s}</div></div>`).join('');
+ levelEl.textContent=`체감 레벨: ${levelFrom(best)} · 최고 역할 ${best}/100`;
+ const cs=parseFloat($('#currentStars').value),ps=parseFloat($('#potentialStars').value);
+ const stars=Number.isFinite(cs)||Number.isFinite(ps)?`\n별점 참고: 현재 ${Number.isFinite(cs)?cs:'?'} / 잠재 ${Number.isFinite(ps)?ps:'?'} (직접 입력값)`:'';
+ const growth=age==null?'나이 미입력':age<=20?'성장 여지 매우 큼':age<=23?'성장 여지 큼':age<=25?'성장 여지 있음':age<=28?'전성기 진입/유지 구간':'성장보다 현재 기량 중심';
+ const pos=$('#position').value|| (mode==='gk'?'GK':'미입력');
+ const name=$('#name').value||'선수';
+ const text=`${name} · ${pos}
+최적 역할: ${scores[0]?.[0]||'-'} (${best}/100)
+체감 레벨: ${levelFrom(best)}
+연령 평가: ${growth}${stars}
+
+강점: ${topStrengths().join(', ')||'-'}
+약점/낮은 수치: ${topWeaknesses().join(', ')||'-'}
+
+판단: ${recruitment(best,age)}
+
+CA/PA: FM의 숨겨진 CA/PA 정확값은 스크린샷만으로 알 수 없으므로 산출하지 않음.
+이 보고서의 역할 점수는 화면에 보이는 1~20 능력치의 가중 평균을 100점으로 환산한 개인용 지표입니다.`;
+ reportEl.textContent=text;reportCard.hidden=false;reportCard.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function drawBoxes(){
+ const ctx=overlay.getContext('2d'); overlay.width=preview.clientWidth*devicePixelRatio;overlay.height=preview.clientHeight*devicePixelRatio;
+ ctx.scale(devicePixelRatio,devicePixelRatio);ctx.clearRect(0,0,overlay.width,overlay.height);
+ if(!boxesVisible)return;
+ const sx=preview.clientWidth/BASE_W,sy=preview.clientHeight/BASE_H;
+ ctx.lineWidth=1.2;ctx.strokeStyle='#ff4bd8';ctx.fillStyle='rgba(255,75,216,.08)';
+ const t=TEMPLATES[mode];
+ for(const spec of [t.tech,t.mental,t.physical]){
+   for(let i=0;i<spec.n;i++){const x=spec.x*sx,y=(spec.y0+i*spec.step)*sy,w=spec.w*sx,h=spec.h*sy;ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)}
+ }
+}
+file.addEventListener('change',()=>{
+ const f=file.files[0];if(!f)return;
+ const url=URL.createObjectURL(f);preview.onload=()=>{
+   srcImg=preview;$('#previewWrap').hidden=false;scan.disabled=false;showBoxes.disabled=false;
+   const exact=preview.naturalWidth===BASE_W&&preview.naturalHeight===BASE_H;
+   const ratio=Math.abs(preview.naturalWidth/preview.naturalHeight-4/3)<.01;
+   statusEl.textContent=`${preview.naturalWidth}×${preview.naturalHeight} ${exact?'✓ 정확한 iPad 템플릿':ratio?'· 4:3 비율 보정 사용':'· ⚠ 화면 비율이 달라 정확도가 떨어질 수 있음'}`;
+   setProgress(0); drawBoxes();
+ };preview.src=url;
+});
+showBoxes.addEventListener('click',()=>{boxesVisible=!boxesVisible;showBoxes.textContent=boxesVisible?'판독 위치 숨기기':'판독 위치 보기';drawBoxes()});
+window.addEventListener('resize',()=>{if(boxesVisible)drawBoxes()});
+scan.addEventListener('click',scanAttributes);
+$('#rescan').addEventListener('click',scanAttributes);
+$('#fieldBtn').addEventListener('click',()=>setMode('field'));$('#gkBtn').addEventListener('click',()=>setMode('gk'));
+$('#analyze').addEventListener('click',analyze);
+$('#copy').addEventListener('click',async()=>{await navigator.clipboard.writeText(reportEl.textContent);$('#copy').textContent='복사됨';setTimeout(()=>$('#copy').textContent='보고서 복사',1200)});
+$('#save').addEventListener('click',()=>{
+ const blob=new Blob([reportEl.textContent],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);a.download=($('#name').value||'FM26_player')+'_scout.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+});
+setMode('field');
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body>
+</html>
