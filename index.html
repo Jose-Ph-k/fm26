@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>FM26 Scout V3</title>
+<title>FM26 Scout V3.1</title>
 <style>
 :root{
   --bg:#090e1d;--panel:#141b31;--panel2:#0e1528;--line:#2d3959;--text:#f6f7fb;
@@ -58,7 +58,7 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
 <body>
 <main class="wrap">
 <header>
-  <div><h1>FM26 Scout V3</h1><div class="muted">iPad 2732×2048 고정 좌표 판독 · 무료 · 이미지 외부 업로드 없음</div></div>
+  <div><h1>FM26 Scout V3.1</h1><div class="muted">iPad 2732×2048 고정 좌표 판독 · GK/필드 자동 구분 · 무료</div></div>
   <span class="badge">FIXED 2732×2048</span>
 </header>
 
@@ -77,7 +77,7 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
   </div>
   <div id="status">스크린샷을 선택하세요.</div>
   <div class="progress"><i id="bar"></i></div>
-  <div class="notice">능력치 이름은 OCR하지 않습니다. 정해진 위치의 숫자 칸만 읽습니다. 2732×2048이 아니어도 같은 4:3 화면이면 비율 보정하지만, 정확도는 원본 해상도가 가장 높습니다.</div>
+  <div class="notice">GK/필드 선수는 화면의 GK 표식을 먼저 자동 판별합니다. 그 뒤 해당 선수 유형의 능력치 좌표만 읽습니다. 2732×2048이 아니어도 같은 4:3 화면이면 비율 보정하지만, 정확도는 원본 해상도가 가장 높습니다.</div>
 </section>
 
 <section class="card" id="metaCard" hidden>
@@ -137,10 +137,12 @@ const TEMPLATES={
  },
  meta:{
    name:{x:505,y:305,w:420,h:62},
-   position:{x:500,y:365,w:210,h:64},
-   age:{x:675,y:365,w:90,h:64},
+   position:{x:495,y:370,w:250,h:70},
+   gkBadge:{x:490,y:370,w:125,h:72},
+   pitchPosition:{x:285,y:1045,w:240,h:90},
+   age:{x:675,y:365,w:110,h:70},
    nation:{x:510,y:438,w:150,h:58},
-   value:{x:1680,y:348,w:210,h:55},
+   value:{x:1680,y:348,w:185,h:55},
    height:{x:2250,y:878,w:130,h:55}
  }
 };
@@ -223,23 +225,41 @@ async function readText(rect, whitelist, psm=7){
  await w.setParameters({tessedit_char_whitelist:whitelist||'',tessedit_pageseg_mode:String(psm)});
  const {data}=await w.recognize(c); return (data.text||'').replace(/\n/g,' ').trim();
 }
+async function detectPlayerMode(){
+ try{
+   setProgress(14,'포지션 자동 판별 중…');
+   // GK는 화면 상단 포지션 배지와 왼쪽 포지션 표시에 영문 GK가 고정으로 나타난다.
+   // 두 군데를 각각 읽어 한 곳이라도 GK가 잡히면 골키퍼 템플릿을 사용한다.
+   const a=await readText(TEMPLATES.meta.gkBadge,'GK',7);
+   const b=await readText(TEMPLATES.meta.pitchPosition,'GK',7);
+   const joined=(a+' '+b).toUpperCase().replace(/[^GK]/g,'');
+   const isGK=joined.includes('GK') || (joined.includes('G') && joined.includes('K'));
+   setMode(isGK?'gk':'field');
+   statusEl.textContent=`자동 분류: ${isGK?'골키퍼':'필드 선수'} · 상단/포지션 표식 확인`;
+   return isGK?'gk':'field';
+ }catch(e){
+   console.warn('player type detect',e);
+   setMode('field');
+   return 'field';
+ }
+}
 async function readMeta(){
  try{
    setProgress(12,'상단 정보 간단 판독 중…');
    const name=await readText(TEMPLATES.meta.name,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'");
    $('#name').value=name.replace(/[^A-Za-zÀ-ÿ .'\-]/g,'').trim();
    const pos=await readText(TEMPLATES.meta.position,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()/,- ');
-   $('#position').value=pos.trim();
+   const posClean=pos.trim();
+   $('#position').value=mode==='gk'?'GK':posClean;
    const ageText=await readText(TEMPLATES.meta.age,'0123456789');
    const age=parseNum(ageText,15,50); if(age)$('#age').value=age;
    const nation=await readText(TEMPLATES.meta.nation,'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
    $('#nation').value=nation.replace(/[^A-Z]/g,'').slice(0,3);
    const val=await readText(TEMPLATES.meta.value,'0123456789,.');
-   $('#value').value=(val.match(/[\d,.]+/)||[''])[0];
+   const vm=(val.match(/[\d,.]+/)||[''])[0].replace(/[,.]$/,'');
+   $('#value').value=vm;
    const ht=await readText(TEMPLATES.meta.height,'0123456789');
    const hv=parseNum(ht,140,220); if(hv)$('#height').value=hv;
-   const p=$('#position').value.toUpperCase();
-   if(/\bGK\b/.test(p)) setMode('gk'); else if(p) setMode('field');
  }catch(e){ console.warn('meta OCR',e); }
 }
 async function scanAttributes(){
@@ -248,6 +268,7 @@ async function scanAttributes(){
  try{
    await ensureWorker();
    metaCard.hidden=false;
+   await detectPlayerMode();
    await readMeta();
    const t=TEMPLATES[mode];
    const techNames=mode==='gk'?GK_TECH:FIELD_TECH;
@@ -262,7 +283,10 @@ async function scanAttributes(){
  finally{scan.disabled=false;if($('#rescan'))$('#rescan').disabled=false}
 }
 function setMode(m){
- mode=m; $('#fieldBtn').classList.toggle('active',m==='field');$('#gkBtn').classList.toggle('active',m==='gk');
+ mode=m;
+ $('#fieldBtn').classList.toggle('active',m==='field');
+ $('#gkBtn').classList.toggle('active',m==='gk');
+ if(m==='gk') $('#position').value='GK';
  if(attrsCard.hidden===false){attrData={};renderAttrs()}
  if(boxesVisible)drawBoxes();
 }

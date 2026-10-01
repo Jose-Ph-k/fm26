@@ -1,4 +1,4 @@
-FM26 Scout V3 — iPad 2732×2048 Fixed Coordinate Edition
+FM26 Scout V3.1 — iPad 2732×2048 Fixed Coordinate Edition
 
 핵심
 - 유료 API 없음 / API 키 없음.
@@ -21,3 +21,10 @@ GitHub/Vercel 교체
 - iPad 원본 스크린샷 2732×2048
 - 선수 보고서 > 개요
 - 화면 확대/축소 없이 원본 UI
+
+V3.1 변경점
+- 골키퍼/필드 선수 자동 판별을 별도 단계로 분리.
+- 상단 포지션 배지 + 왼쪽 포지션 표식을 이중 확인.
+- GK 판별 시 왼쪽 능력치 창을 GK 13개 항목으로 자동 전환.
+- 필드 선수용 15개 기술 능력치가 GK 화면에 잘못 적용되던 문제 수정.
+- GK 화면 아래쪽 빈 칸에 OCR 박스가 추가로 생기던 문제 수정.
