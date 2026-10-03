@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>FM26 Scout V3.1</title>
+<title>FM26 Scout V3.4</title>
 <style>
 :root{
   --bg:#090e1d;--panel:#141b31;--panel2:#0e1528;--line:#2d3959;--text:#f6f7fb;
@@ -38,6 +38,7 @@ button:disabled{opacity:.5}
 .field{background:var(--panel2);padding:10px;border-radius:11px}
 .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
 .field input,.field select{width:100%;border:1px solid #32405f;background:#0b1122;color:#fff;border-radius:8px;padding:8px;font-size:14px}
+.field input.invalid{border-color:#ff7474;box-shadow:0 0 0 1px #ff7474 inset}.validation{font-size:11px;color:#ffb0b0;margin-top:5px;min-height:14px}
 .typebar{display:flex;gap:8px;margin-bottom:12px}.typebar button{flex:1}
 .typebar button.active{outline:2px solid var(--purple);background:#392064}
 .attrCols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -58,7 +59,7 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
 <body>
 <main class="wrap">
 <header>
-  <div><h1>FM26 Scout V3.1</h1><div class="muted">iPad 2732×2048 고정 좌표 판독 · GK/필드 자동 구분 · 무료</div></div>
+  <div><h1>FM26 Scout V3.4</h1><div class="muted">iPad 2732×2048 고정 좌표 판독 · GK/필드 자동 구분 · FM 값 검증 · 무료</div></div>
   <span class="badge">FIXED 2732×2048</span>
 </header>
 
@@ -77,7 +78,7 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
   </div>
   <div id="status">스크린샷을 선택하세요.</div>
   <div class="progress"><i id="bar"></i></div>
-  <div class="notice">GK/필드 선수는 화면의 GK 표식을 먼저 자동 판별합니다. 그 뒤 해당 선수 유형의 능력치 좌표만 읽습니다. 2732×2048이 아니어도 같은 4:3 화면이면 비율 보정하지만, 정확도는 원본 해상도가 가장 높습니다.</div>
+  <div class="notice">GK/필드 선수는 화면의 GK 표식을 먼저 자동 판별합니다. 필드 선수의 '세트피스'는 능력치가 아닌 섹션 헤더로 처리해 숫자 판독에서 건너뜁니다. 2732×2048이 아니어도 같은 4:3 화면이면 비율 보정하지만, 정확도는 원본 해상도가 가장 높습니다.</div>
 </section>
 
 <section class="card" id="metaCard" hidden>
@@ -89,14 +90,14 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
   <div class="grid">
     <div class="field"><label>이름</label><input id="name" placeholder="자동 판독 / 직접 수정"></div>
     <div class="field"><label>나이</label><input id="age" type="number" min="15" max="50"></div>
-    <div class="field"><label>포지션</label><input id="position" placeholder="예: ST (C), D/WB (L), GK"></div>
+    <div class="field"><label>포지션</label><input id="position" placeholder="예: ST (C), D/WB (L), GK"><div id="positionMsg" class="validation"></div></div>
     <div class="field"><label>국가 코드</label><input id="nation" placeholder="예: POR"></div>
-    <div class="field"><label>시장가치(억원, 선택)</label><input id="value" inputmode="decimal"></div>
-    <div class="field"><label>신장(cm, 선택)</label><input id="height" inputmode="numeric"></div>
-    <div class="field"><label>현재 별점(직접 입력 가능)</label><input id="currentStars" inputmode="decimal" placeholder="예: 3.5"></div>
-    <div class="field"><label>잠재 별점(직접 입력 가능)</label><input id="potentialStars" inputmode="decimal" placeholder="예: 4.5"></div>
+    <div class="field"><label>시장가치(억원, 선택)</label><input id="value" inputmode="decimal"><div id="valueMsg" class="validation"></div></div>
+    <div class="field"><label>신장(cm, 선택)</label><input id="height" inputmode="numeric"><div id="heightMsg" class="validation"></div></div>
+    <div class="field"><label>현재 별점(직접 입력 가능)</label><input id="currentStars" inputmode="decimal" placeholder="예: 3.5"><div id="currentStarsMsg" class="validation"></div></div>
+    <div class="field"><label>잠재 별점(직접 입력 가능)</label><input id="potentialStars" inputmode="decimal" placeholder="예: 4.5"><div id="potentialStarsMsg" class="validation"></div></div>
   </div>
-  <details><summary>상단 정보는 왜 일부만 자동인가?</summary><p class="notice">무료·빠른 판독을 위해 숫자 능력치는 고정 좌표 숫자 OCR을 사용하고, 이름·포지션처럼 문자 인식이 필요한 부분만 영어 OCR을 사용합니다. 한국어 클럽명/성격은 분석 필수값이 아니므로 자동 OCR 대상에서 제외했습니다.</p></details>
+  <details><summary>상단 정보는 왜 일부만 자동인가?</summary><p class="notice">무료·빠른 판독을 위해 능력치는 고정 좌표 OCR을 사용합니다. 포지션·시장가치·신장·별점은 OCR 뒤 FM에서 가능한 형식인지 다시 검증하고, 말이 안 되는 값은 자동으로 버립니다.</p></details>
 </section>
 
 <section class="card" id="attrsCard" hidden>
@@ -119,25 +120,28 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const BASE_W=2732, BASE_H=2048;
-const FIELD_TECH=['개인기','골 결정력','드리블','일대일 마크','중거리 슛','크로스','태클','패스','퍼스트 터치','헤더','세트피스','장거리 스로인','코너킥','페널티킥','프리킥'];
+const FIELD_TECH=['개인기','골 결정력','드리블','일대일 마크','중거리 슛','크로스','태클','패스','퍼스트 터치','헤더','장거리 스로인','코너킥','페널티킥','프리킥'];
 const MENTAL=['대담성','리더십','수비 위치 선정','승부욕','시야','예측력','오프 더 볼','적극성','집중력','천재성','침착성','팀워크','판단력','활동량'];
 const PHYSICAL=['가속도','균형 감각','몸싸움','민첩성','점프 거리','주력','지구력','타고난 체력'];
 const GK_TECH=['골킥','공 던지기','공중 장악력','기행','돌진(빈도)','반사 신경','볼 핸들링','수비 조율','일대일 방어','패스','퍼스트 터치','펀칭(빈도)','페널티 박스 장악력'];
+const GK_OUTFIELD_TECH=['개인기','페널티킥','프리킥'];
 
 const TEMPLATES={
  field:{
-  tech:{x:1010,y0:788,w:70,h:46,step:48,n:15},
+  tech:{x:1010,y0:788,w:70,h:46,step:48,n:14,rowSlots:[0,1,2,3,4,5,6,7,8,9,11,12,13,14]},
   mental:{x:1543,y0:788,w:70,h:46,step:48,n:14},
   physical:{x:2070,y0:788,w:72,h:46,step:48,n:8}
  },
  gk:{
   tech:{x:1012,y0:789,w:70,h:42,step:43,n:13},
   mental:{x:1543,y0:788,w:70,h:46,step:48,n:14},
-  physical:{x:2070,y0:788,w:72,h:46,step:48,n:8}
+  physical:{x:2070,y0:788,w:72,h:46,step:48,n:8},
+  outfieldTech:{x:2070,y0:1214,w:72,h:46,step:48,n:3},
+  fieldPlayerRating:{x:2028,y:1391,w:160,h:58}
  },
  meta:{
    name:{x:505,y:305,w:420,h:62},
-   position:{x:495,y:370,w:250,h:70},
+   position:{x:495,y:370,w:190,h:70},
    gkBadge:{x:490,y:370,w:125,h:72},
    pitchPosition:{x:285,y:1045,w:240,h:90},
    age:{x:675,y:365,w:110,h:70},
@@ -151,7 +155,7 @@ const $=s=>document.querySelector(s);
 const file=$('#file'), preview=$('#preview'), overlay=$('#overlay'), scan=$('#scan'), showBoxes=$('#showBoxes');
 const statusEl=$('#status'), bar=$('#bar'), metaCard=$('#metaCard'), attrsCard=$('#attrsCard'), attrsEl=$('#attrs');
 const reportCard=$('#reportCard'), rolesEl=$('#roles'), reportEl=$('#report'), levelEl=$('#level');
-let srcImg=null, mode='field', worker=null, boxesVisible=false, attrData={};
+let srcImg=null, mode='field', worker=null, boxesVisible=false, attrData={}, fieldPlayerRating=null;
 
 function setProgress(p,msg){bar.style.width=Math.max(0,Math.min(100,p))+'%'; if(msg)statusEl.textContent=msg}
 function scaleRect(r){
@@ -208,10 +212,28 @@ function parseNum(s,min=1,max=20){
  for(let len=2;len>=1;len--){let q=parseInt(digs.slice(-len),10);if(q>=min&&q<=max)return q}
  return null;
 }
+function parseRating10(s){
+ const raw=(s||'').replace(/\s/g,'');
+ const m=raw.match(/(10|[0-9])\s*\/\s*10/);
+ if(m)return +m[1];
+ const digs=raw.replace(/[^\d]/g,'');
+ if(digs==='10')return 10;
+ if(digs.endsWith('10')){
+   const n=parseInt(digs.slice(0,-2),10);
+   if(n>=0&&n<=10)return n;
+ }
+ const n=parseInt(digs,10);
+ return n>=0&&n<=10?n:null;
+}
+async function readRating10(rect){
+ const txt=await ocrCanvas(preprocessNumber(rect),'0123456789/',7);
+ return parseRating10(txt);
+}
 async function readRows(spec,names,group,p0,p1){
  const out={};
  for(let i=0;i<spec.n;i++){
-   const y=spec.y0+i*spec.step;
+   const slot=spec.rowSlots?spec.rowSlots[i]:i;
+   const y=spec.y0+slot*spec.step;
    const rect={x:spec.x,y,w:spec.w,h:spec.h};
    const txt=await ocrCanvas(preprocessNumber(rect));
    out[names[i]]=parseNum(txt);
@@ -243,23 +265,112 @@ async function detectPlayerMode(){
    return 'field';
  }
 }
+
+function normalizePosition(raw){
+ const t=(raw||'').toUpperCase()
+   .replace(/[【\[\{]/g,'(').replace(/[】\]\}]/g,')')
+   .replace(/\s+/g,'').replace(/;/g,',');
+ if(!t)return '';
+ const atom='(?:GK|DM|(?:D|WB|M|AM|ST)(?:\\/(?:D|WB|M|AM|ST))*\\([LCR]{1,3}\\))';
+ const full=new RegExp('^'+atom+'(?:,'+atom+')*$');
+ if(!full.test(t))return '';
+ return t.replace(/,/g,', ');
+}
+function normalizeMarketValue(raw){
+ const t=(raw||'').replace(/\s/g,'');
+ if(!t)return '';
+ const comma=t.match(/\d{1,3}(?:,\d{3})+/);
+ if(comma){
+   const n=parseInt(comma[0].replace(/,/g,''),10);
+   return Number.isFinite(n)&&n>=0&&n<=50000?String(n):'';
+ }
+ const groups=t.match(/\d+/g)||[];
+ for(const g of groups){
+   const n=parseInt(g,10);
+   if(Number.isFinite(n)&&n>=0&&n<=50000)return String(n);
+ }
+ return '';
+}
+function normalizeHeight(raw){
+ const n=parseInt(String(raw||'').replace(/\D/g,''),10);
+ return Number.isFinite(n)&&n>=145&&n<=220?String(n):'';
+}
+function normalizeAge(raw){
+ const n=parseInt(String(raw||'').replace(/\D/g,''),10);
+ return Number.isFinite(n)&&n>=15&&n<=50?String(n):'';
+}
+function normalizeStars(raw){
+ if(raw==null||raw==='')return '';
+ const n=Number(String(raw).replace(',','.'));
+ if(!Number.isFinite(n)||n<0||n>5)return '';
+ const doubled=Math.round(n*2);
+ return Math.abs(n*2-doubled)<0.001?String(doubled/2):'';
+}
+function setFieldValidity(id,msgId,valid,msg=''){
+ const el=$('#'+id), m=$('#'+msgId);
+ if(!el||!m)return;
+ el.classList.toggle('invalid',!valid);
+ m.textContent=valid?'':msg;
+}
+function validateMetaFields(){
+ const pos=$('#position').value.trim();
+ const posNorm=normalizePosition(pos);
+ const posOk=!pos||!!posNorm;
+ setFieldValidity('position','positionMsg',posOk,'FM 포지션 형식이 아니라서 무시됩니다.');
+ if(pos&&posOk) $('#position').value=posNorm;
+ if(pos&&!posOk) $('#position').value='';
+
+ const vv=$('#value').value.trim();
+ const vNorm=normalizeMarketValue(vv);
+ const vOk=!vv||vNorm!=='';
+ setFieldValidity('value','valueMsg',vOk,'시장가치 판독값이 비정상이라 무시됩니다.');
+ if(vv&&vOk) $('#value').value=vNorm;
+ if(vv&&!vOk) $('#value').value='';
+
+ const hh=$('#height').value.trim();
+ const hNorm=normalizeHeight(hh);
+ const hOk=!hh||hNorm!=='';
+ setFieldValidity('height','heightMsg',hOk,'145~220cm 범위 밖이라 무시됩니다.');
+ if(hh&&hOk) $('#height').value=hNorm;
+ if(hh&&!hOk) $('#height').value='';
+
+ for(const id of ['currentStars','potentialStars']){
+   const raw=$('#'+id).value.trim();
+   const norm=normalizeStars(raw);
+   const ok=!raw||norm!=='';
+   setFieldValidity(id,id+'Msg',ok,'별점은 0~5 범위, 0.5 단위만 허용합니다.');
+   if(raw&&ok) $('#'+id).value=norm;
+   if(raw&&!ok) $('#'+id).value='';
+ }
+}
+
 async function readMeta(){
  try{
    setProgress(12,'상단 정보 간단 판독 중…');
    const name=await readText(TEMPLATES.meta.name,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'");
    $('#name').value=name.replace(/[^A-Za-zÀ-ÿ .'\-]/g,'').trim();
    const pos=await readText(TEMPLATES.meta.position,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()/,- ');
-   const posClean=pos.trim();
-   $('#position').value=mode==='gk'?'GK':posClean;
+   const posClean=mode==='gk'?'GK':normalizePosition(pos);
+   $('#position').value=posClean;
+   if(mode!=='gk' && !posClean && pos.trim()){
+     setFieldValidity('position','positionMsg',false,'포지션 OCR 결과가 FM 형식과 맞지 않아 폐기했습니다.');
+   }else setFieldValidity('position','positionMsg',true);
+
    const ageText=await readText(TEMPLATES.meta.age,'0123456789');
-   const age=parseNum(ageText,15,50); if(age)$('#age').value=age;
+   const age=normalizeAge(ageText); if(age)$('#age').value=age;
+
    const nation=await readText(TEMPLATES.meta.nation,'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
    $('#nation').value=nation.replace(/[^A-Z]/g,'').slice(0,3);
+
    const val=await readText(TEMPLATES.meta.value,'0123456789,.');
-   const vm=(val.match(/[\d,.]+/)||[''])[0].replace(/[,.]$/,'');
+   const vm=normalizeMarketValue(val);
    $('#value').value=vm;
+   setFieldValidity('value','valueMsg',!!vm || !val.trim(),vm?'':'시장가치 OCR 결과가 비정상이라 폐기했습니다.');
+
    const ht=await readText(TEMPLATES.meta.height,'0123456789');
-   const hv=parseNum(ht,140,220); if(hv)$('#height').value=hv;
+   const hv=normalizeHeight(ht);
+   if(hv)$('#height').value=hv;
+   setFieldValidity('height','heightMsg',!!hv || !ht.trim(),hv?'':'신장 OCR 결과가 비정상이라 폐기했습니다.');
  }catch(e){ console.warn('meta OCR',e); }
 }
 async function scanAttributes(){
@@ -272,10 +383,18 @@ async function scanAttributes(){
    await readMeta();
    const t=TEMPLATES[mode];
    const techNames=mode==='gk'?GK_TECH:FIELD_TECH;
-   const tech=await readRows(t.tech,techNames,mode==='gk'?'골키퍼 능력':'기술',28,58);
-   const mental=await readRows(t.mental,MENTAL,'멘탈',58,82);
-   const physical=await readRows(t.physical,PHYSICAL,'신체',82,98);
-   attrData={...tech,...mental,...physical};
+   const tech=await readRows(t.tech,techNames,mode==='gk'?'골키퍼 능력':'기술',28,55);
+   const mental=await readRows(t.mental,MENTAL,'멘탈',55,76);
+   const physical=await readRows(t.physical,PHYSICAL,'신체',76,90);
+   if(mode==='gk'){
+     const outfieldTech=await readRows(t.outfieldTech,GK_OUTFIELD_TECH,'GK 기술',90,98);
+     fieldPlayerRating=await readRating10(t.fieldPlayerRating);
+     setProgress(99,`필드 선수 등급 = ${fieldPlayerRating==null?'?':fieldPlayerRating+'/10'}`);
+     attrData={...tech,...mental,...physical,...outfieldTech};
+   }else{
+     fieldPlayerRating=null;
+     attrData={...tech,...mental,...physical};
+   }
    renderAttrs();
    attrsCard.hidden=false;
    setProgress(100,'판독 완료. 틀린 숫자가 있으면 수정한 뒤 스카우팅 계산을 누르세요.');
@@ -287,7 +406,7 @@ function setMode(m){
  $('#fieldBtn').classList.toggle('active',m==='field');
  $('#gkBtn').classList.toggle('active',m==='gk');
  if(m==='gk') $('#position').value='GK';
- if(attrsCard.hidden===false){attrData={};renderAttrs()}
+ if(attrsCard.hidden===false){attrData={};fieldPlayerRating=null;renderAttrs()}
  if(boxesVisible)drawBoxes();
 }
 function renderAttrs(){
@@ -295,9 +414,13 @@ function renderAttrs(){
    [mode==='gk'?'골키퍼':'기술',mode==='gk'?GK_TECH:FIELD_TECH],
    ['멘탈',MENTAL],['신체',PHYSICAL]
  ];
+ if(mode==='gk')cols.push(['기술',GK_OUTFIELD_TECH]);
+ attrsEl.style.gridTemplateColumns=mode==='gk'?'repeat(4,1fr)':'repeat(3,1fr)';
  attrsEl.innerHTML=cols.map(([title,names])=>`<div class="attrCol"><b>${title}</b>${names.map(n=>`
- <div class="attrRow"><span>${n}</span><input data-attr="${n}" type="number" min="1" max="20" value="${attrData[n]??''}" placeholder="?"></div>`).join('')}</div>`).join('');
- attrsEl.querySelectorAll('input').forEach(i=>i.addEventListener('input',()=>{const v=+i.value;attrData[i.dataset.attr]=(v>=1&&v<=20)?v:null}));
+ <div class="attrRow"><span>${n}</span><input data-attr="${n}" type="number" min="1" max="20" value="${attrData[n]??''}" placeholder="?"></div>`).join('')}${mode==='gk'&&title==='기술'?`
+ <div class="attrRow" style="margin-top:9px;padding-top:10px;border-top:1px solid #3b4868"><span>필드 선수 등급</span><input id="fieldPlayerRating" type="number" min="0" max="10" value="${fieldPlayerRating??''}" placeholder="?"></div>`:''}</div>`).join('');
+ attrsEl.querySelectorAll('input[data-attr]').forEach(i=>i.addEventListener('input',()=>{const v=+i.value;attrData[i.dataset.attr]=(v>=1&&v<=20)?v:null}));
+ const fr=$('#fieldPlayerRating'); if(fr)fr.addEventListener('input',()=>{const v=+fr.value;fieldPlayerRating=(v>=0&&v<=10)?v:null});
 }
 function v(n){const x=+attrData[n];return x>=1&&x<=20?x:null}
 function weighted(weights){
@@ -342,6 +465,7 @@ function recruitment(best,age){
  return '관찰 유지 — 가격, 별점, 경기력 자료를 추가로 확인하는 편이 좋습니다.';
 }
 function analyze(){
+ validateMetaFields();
  const roles=mode==='gk'?ROLE_GK:ROLE_FIELD;
  const scores=Object.entries(roles).map(([n,w])=>[n,weighted(w)]).sort((a,b)=>b[1]-a[1]);
  const best=scores[0]?.[1]||0,age=+$('#age').value||null;
@@ -352,10 +476,11 @@ function analyze(){
  const growth=age==null?'나이 미입력':age<=20?'성장 여지 매우 큼':age<=23?'성장 여지 큼':age<=25?'성장 여지 있음':age<=28?'전성기 진입/유지 구간':'성장보다 현재 기량 중심';
  const pos=$('#position').value|| (mode==='gk'?'GK':'미입력');
  const name=$('#name').value||'선수';
+ const extraRating=mode==='gk'&&fieldPlayerRating!=null?`\n필드 선수 등급: ${fieldPlayerRating}/10 (GK 역할 점수에는 미반영)`:'';
  const text=`${name} · ${pos}
 최적 역할: ${scores[0]?.[0]||'-'} (${best}/100)
 체감 레벨: ${levelFrom(best)}
-연령 평가: ${growth}${stars}
+연령 평가: ${growth}${stars}${extraRating}
 
 강점: ${topStrengths().join(', ')||'-'}
 약점/낮은 수치: ${topWeaknesses().join(', ')||'-'}
@@ -373,8 +498,17 @@ function drawBoxes(){
  const sx=preview.clientWidth/BASE_W,sy=preview.clientHeight/BASE_H;
  ctx.lineWidth=1.2;ctx.strokeStyle='#ff4bd8';ctx.fillStyle='rgba(255,75,216,.08)';
  const t=TEMPLATES[mode];
- for(const spec of [t.tech,t.mental,t.physical]){
-   for(let i=0;i<spec.n;i++){const x=spec.x*sx,y=(spec.y0+i*spec.step)*sy,w=spec.w*sx,h=spec.h*sy;ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)}
+ const specs=[t.tech,t.mental,t.physical];
+ if(mode==='gk')specs.push(t.outfieldTech);
+ for(const spec of specs){
+   for(let i=0;i<spec.n;i++){
+     const slot=spec.rowSlots?spec.rowSlots[i]:i;
+     const x=spec.x*sx,y=(spec.y0+slot*spec.step)*sy,w=spec.w*sx,h=spec.h*sy;
+     ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h);
+   }
+ }
+ if(mode==='gk'){
+   const r=t.fieldPlayerRating;ctx.fillRect(r.x*sx,r.y*sy,r.w*sx,r.h*sy);ctx.strokeRect(r.x*sx,r.y*sy,r.w*sx,r.h*sy);
  }
 }
 file.addEventListener('change',()=>{
@@ -393,6 +527,9 @@ scan.addEventListener('click',scanAttributes);
 $('#rescan').addEventListener('click',scanAttributes);
 $('#fieldBtn').addEventListener('click',()=>setMode('field'));$('#gkBtn').addEventListener('click',()=>setMode('gk'));
 $('#analyze').addEventListener('click',analyze);
+['position','value','height','currentStars','potentialStars'].forEach(id=>{
+ const el=$('#'+id); if(el)el.addEventListener('change',validateMetaFields);
+});
 $('#copy').addEventListener('click',async()=>{await navigator.clipboard.writeText(reportEl.textContent);$('#copy').textContent='복사됨';setTimeout(()=>$('#copy').textContent='보고서 복사',1200)});
 $('#save').addEventListener('click',()=>{
  const blob=new Blob([reportEl.textContent],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');
