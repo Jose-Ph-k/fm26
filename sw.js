@@ -1,4 +1,4 @@
-const CACHE='fm26-scout-v3-5-multipass';
+const CACHE='fm26-scout-v3-6-color-stars';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',e=>{

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>FM26 Scout V3.5</title>
+<title>FM26 Scout V3.6</title>
 <style>
 :root{
   --bg:#090e1d;--panel:#141b31;--panel2:#0e1528;--line:#2d3959;--text:#f6f7fb;
@@ -62,8 +62,8 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
 <main class="wrap">
 <header>
   <div>
-    <h1>FM26 Scout V3.5</h1>
-    <div class="muted">다중 스크린샷 · 5-pass 숫자 OCR · 저신뢰도 확인 · GK/필드 자동 구분 · 무료</div>
+    <h1>FM26 Scout V3.6</h1>
+    <div class="muted">색상+OCR 보정 · 별점 자동판독 · 다중 스크린샷 · GK/필드 자동 구분 · 무료</div>
   </div>
   <span class="badge">2732×2048 기준</span>
 </header>
@@ -85,8 +85,8 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
   <div id="status">스크린샷을 선택하세요.</div>
   <div class="progress"><i id="bar"></i></div>
   <div class="notice">
-    숫자는 원본 확대·이진화·임계값 변화·획 보강 등 5가지 방식으로 반복 판독합니다.
-    능력치 1~20, 나이 15~50 범위를 검증하며 판독이 충돌한 칸은 주황색으로 표시합니다.
+    숫자는 5-pass OCR에 FM 숫자 색상(1~10 / 11~15 / 16~20)을 함께 사용합니다.
+    별점은 노란색을 확정값, 흰색을 불확실 범위로 읽어 최소~최대값으로 표시합니다. 실제 충돌이 남은 칸만 주황색으로 표시합니다.
   </div>
   <div id="multiWarn" class="warnBox" hidden></div>
 </section>
@@ -104,8 +104,11 @@ details{margin-top:12px} summary{cursor:pointer;color:var(--muted)}
     <div class="field"><label>국가 코드</label><input id="nation" placeholder="예: POR"></div>
     <div class="field"><label>시장가치(억원, 선택)</label><input id="value" inputmode="decimal"><div id="valueMsg" class="validation"></div></div>
     <div class="field"><label>신장(cm, 선택)</label><input id="height" inputmode="numeric"><div id="heightMsg" class="validation"></div></div>
-    <div class="field"><label>현재 별점(직접 입력)</label><input id="currentStars" inputmode="decimal" placeholder="예: 3.5"><div id="currentStarsMsg" class="validation"></div></div>
-    <div class="field"><label>잠재 별점(직접 입력)</label><input id="potentialStars" inputmode="decimal" placeholder="예: 4.5"><div id="potentialStarsMsg" class="validation"></div></div>
+    <div class="field"><label>현재 별점 최소(노란 별)</label><input id="currentStars" inputmode="decimal" placeholder="자동"><div id="currentStarsMsg" class="validation"></div></div>
+    <div class="field"><label>현재 별점 최대(흰 별 포함)</label><input id="currentStarsMax" inputmode="decimal" placeholder="자동"><div id="currentStarsMaxMsg" class="validation"></div></div>
+    <div class="field"><label>잠재 별점 최소(노란 별)</label><input id="potentialStars" inputmode="decimal" placeholder="자동"><div id="potentialStarsMsg" class="validation"></div></div>
+    <div class="field"><label>잠재 별점 최대(흰 별 포함)</label><input id="potentialStarsMax" inputmode="decimal" placeholder="자동"><div id="potentialStarsMaxMsg" class="validation"></div></div>
+    <div class="field" style="grid-column:1/-1"><label>별점 판독</label><div id="starSummary" class="notice" style="margin-top:0">스크린샷 판독 후 자동 표시됩니다.</div></div>
   </div>
 </section>
 
@@ -155,14 +158,19 @@ const TEMPLATES={
   fieldPlayerRating:{x:2028,y:1391,w:160,h:58}
  },
  meta:{
-   name:{x:505,y:305,w:420,h:62},
-   position:{x:495,y:370,w:190,h:70},
-   gkBadge:{x:490,y:370,w:125,h:72},
+   name:{x:505,y:305,w:440,h:66},
+   position:{x:525,y:370,w:150,h:60},
+   gkBadge:{x:500,y:370,w:150,h:70},
    pitchPosition:{x:285,y:1045,w:240,h:90},
-   age:{x:675,y:365,w:110,h:70},
-   nation:{x:510,y:438,w:150,h:58},
-   value:{x:1680,y:348,w:185,h:55},
-   height:{x:2250,y:878,w:130,h:55}
+   age:{x:680,y:370,w:360,h:58},
+   nation:{x:565,y:430,w:95,h:58},
+   value:{x:1340,y:345,w:210,h:62},
+   height:{x:2260,y:875,w:150,h:58},
+   stars:{
+     y:429,
+     current:[2162,2200,2238,2276,2314],
+     potential:[2406,2444,2482,2520,2558]
+   }
  }
 };
 
@@ -173,6 +181,7 @@ const reportCard=$('#reportCard'),rolesEl=$('#roles'),reportEl=$('#report'),leve
 
 let srcImg=null,mode='field',worker=null,boxesVisible=false,attrData={},fieldPlayerRating=null;
 let selectedFiles=[],attrWarnings=new Set(),scanResults=[],previewUrl=null;
+let starData={currentMin:null,currentMax:null,potentialMin:null,potentialMax:null};
 
 function setProgress(p,msg){
  bar.style.width=Math.max(0,Math.min(100,p))+'%';
@@ -267,28 +276,98 @@ function chooseVote(values){
  const numeric=best!==null&&good.some(v=>typeof v==='number')?Number(best):best;
  return {value:numeric,votes:bestCount,total:good.length,distinct:counts.size};
 }
-async function readNumberRobust(rect,min=1,max=20){
- const variants=[
-   [makeCrop(rect,4),8],
-   [makeCrop(rect,6),10],
-   [preprocessNumber(rect,5,0,false),8],
-   [preprocessNumber(rect,6,12,false),10],
-   [preprocessNumber(rect,6,-10,true),10]
- ];
- const raws=[],values=[];
- for(const [canvas,psm] of variants){
-   const raw=await ocrCanvas(canvas,'0123456789Il|OQ',psm);
-   raws.push(raw);
-   values.push(parseNum(raw,min,max));
+function classifyNumberBand(rect){
+ const c=makeCrop(rect,1),ctx=c.getContext('2d',{willReadFrequently:true});
+ const d=ctx.getImageData(0,0,c.width,c.height).data;
+ let green=0,yellow=0;
+ for(let i=0;i<d.length;i+=4){
+   const r=d[i],g=d[i+1],b=d[i+2];
+   if(g>140 && g>r*1.25 && g>b*1.5)green++;
+   if(r>180 && g>110 && b<120 && r>g)yellow++;
  }
- const vote=chooseVote(values);
- const val=vote.value===null?null:Number(vote.value);
+ if(green>20)return 'high';   // 16~20
+ if(yellow>20)return 'mid';   // 11~15
+ return 'low';                // 1~10
+}
+function fitValueToBand(v,band){
+ if(v==null)return null;
+ if(band==='low')return (v>=1&&v<=10)?v:null;
+ if(band==='mid'){
+   if(v>=11&&v<=15)return v;
+   if(v>=1&&v<=5)return v+10;
+   return null;
+ }
+ if(band==='high'){
+   if(v>=16&&v<=20)return v;
+   if(v>=6&&v<=9)return v+10;
+   if(v===10)return 20;
+   return null;
+ }
+ return v;
+}
+function weightedVote(values,weights){
+ const scores=new Map(),counts=new Map();
+ values.forEach((v,i)=>{
+   if(v==null)return;
+   const k=String(v),w=weights[i]??1;
+   scores.set(k,(scores.get(k)||0)+w);
+   counts.set(k,(counts.get(k)||0)+1);
+ });
+ let best=null,bestScore=-1;
+ for(const [k,score] of scores){
+   if(score>bestScore){best=k;bestScore=score}
+ }
+ return {
+   value:best==null?null:Number(best),
+   score:bestScore,
+   votes:best==null?0:(counts.get(best)||0),
+   distinct:scores.size
+ };
+}
+async function readNumberRobust(rect,min=1,max=20){
+ const band=(min===1&&max===20)?classifyNumberBand(rect):null;
+ const variants=[
+   [makeCrop(rect,4),8,1.45],
+   [makeCrop(rect,6),10,1.45],
+   [preprocessNumber(rect,5,0,false),8,1.0],
+   [preprocessNumber(rect,6,12,false),10,.9],
+   [preprocessNumber(rect,6,-10,true),10,.9],
+   [makeCrop({x:rect.x-5,y:rect.y,w:rect.w+10,h:rect.h},7),10,1.2]
+ ];
+ const raws=[],rawValues=[],values=[],weights=[];
+ for(const [canvas,psm,weight] of variants){
+   const raw=await ocrCanvas(canvas,'0123456789Il|OQ',psm);
+   const parsed=parseNum(raw,min,max);
+   raws.push(raw);
+   rawValues.push(parsed);
+   values.push(band?fitValueToBand(parsed,band):parsed);
+   weights.push(weight);
+ }
+ const vote=weightedVote(values,weights);
+ let val=vote.value;
+
+ // 색상 구간은 확실한데 OCR이 앞자리 1을 전부 놓친 경우를 구조적으로 복구.
+ if(val==null && band){
+   const rawVote=weightedVote(rawValues,weights);
+   val=fitValueToBand(rawVote.value,band);
+ }
+
+ const validValues=values.filter(v=>v!=null);
  const suspicious=
-   val===null ||
-   vote.votes<2 ||
-   vote.distinct>2 ||
-   (val<10&&values.some(v=>v!==null&&v>=10));
- return {...vote,value:val,raws,values,suspicious};
+   val==null ||
+   vote.distinct>1 && vote.votes<3 ||
+   (band && validValues.length===0);
+
+ return {
+   value:val,
+   raws,
+   rawValues,
+   values,
+   band,
+   votes:vote.votes,
+   distinct:vote.distinct,
+   suspicious
+ };
 }
 function parseRating10(s){
  const raw=String(s||'').replace(/\s/g,'').replace(/[IL|]/g,'1').replace(/[OQ]/g,'0');
@@ -318,7 +397,7 @@ async function readRows(spec,names,group,p0,p1,warnings){
    const rect={x:spec.x,y:spec.y0+slot*spec.step,w:spec.w,h:spec.h};
    const rr=await readNumberRobust(rect,1,20);
    out[names[i]]=rr.value;
-   if(rr.suspicious||rr.value===null||(rr.value<10&&rr.votes<3))warnings.add(names[i]);
+   if(rr.suspicious||rr.value===null)warnings.add(names[i]);
    const pct=p0+(p1-p0)*(i+1)/spec.n;
    setProgress(pct,`${group} ${i+1}/${spec.n} · ${names[i]} = ${rr.value??'?'}${warnings.has(names[i])?' ⚠':''}`);
  }
@@ -417,12 +496,16 @@ function validateMetaFields(){
  if(hh&&hOk)$('#height').value=hNorm;
  if(hh&&!hOk)$('#height').value='';
 
- for(const id of ['currentStars','potentialStars']){
+ for(const id of ['currentStars','currentStarsMax','potentialStars','potentialStarsMax']){
    const raw=$('#'+id).value.trim(),norm=normalizeStars(raw),ok=!raw||norm!=='';
    setFieldValidity(id,id+'Msg',ok,'별점은 0~5 범위, 0.5 단위만 허용합니다.');
    if(raw&&ok)$('#'+id).value=norm;
    if(raw&&!ok)$('#'+id).value='';
  }
+ const cmin=parseFloat($('#currentStars').value),cmax=parseFloat($('#currentStarsMax').value);
+ const pmin=parseFloat($('#potentialStars').value),pmax=parseFloat($('#potentialStarsMax').value);
+ if(Number.isFinite(cmin)&&Number.isFinite(cmax)&&cmax<cmin)$('#currentStarsMax').value=$('#currentStars').value;
+ if(Number.isFinite(pmin)&&Number.isFinite(pmax)&&pmax<pmin)$('#potentialStarsMax').value=$('#potentialStars').value;
 }
 async function detectPlayerMode(){
  try{
@@ -437,22 +520,100 @@ async function detectPlayerMode(){
    return 'field';
  }
 }
+function parseAgeFromOCR(raw){
+ const digs=String(raw||'').replace(/[^\d]/g,'');
+ for(let i=0;i<digs.length-1;i++){
+   const n=parseInt(digs.slice(i,i+2),10);
+   if(n>=15&&n<=50)return String(n);
+ }
+ return '';
+}
+async function readTextMulti(rect,whitelist){
+ const attempts=[
+   await ocrCanvas(makeCrop(rect,3),whitelist,7),
+   await ocrCanvas(makeCrop(rect,5),whitelist,7),
+   await ocrCanvas(makeCrop(rect,6),whitelist,8)
+ ];
+ return attempts;
+}
+function bestNormalized(attempts,normalizer){
+ const vals=attempts.map(normalizer).filter(Boolean);
+ if(!vals.length)return '';
+ const vote=chooseVote(vals);
+ return String(vote.value??'');
+}
+function sampleHalfFill(cx,cy,left=true){
+ const rect={x:cx+(left?-18:0),y:cy-18,w:18,h:36};
+ const c=makeCrop(rect,1),ctx=c.getContext('2d',{willReadFrequently:true});
+ const d=ctx.getImageData(0,0,c.width,c.height).data;
+ let gold=0,white=0,total=Math.max(1,c.width*c.height);
+ for(let i=0;i<d.length;i+=4){
+   const r=d[i],g=d[i+1],b=d[i+2];
+   if(r>190&&g>100&&b<130&&(r-b)>80)gold++;
+   const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+   if(r>170&&g>170&&b>170&&(mx-mn)<45)white++;
+ }
+ const gr=gold/total,wr=white/total;
+ if(gr>.045)return 'gold';
+ if(wr>.045)return 'white';
+ return 'none';
+}
+function readStarStrip(centers){
+ let goldHalves=0,whiteHalves=0;
+ for(const cx of centers){
+   for(const left of [true,false]){
+     const kind=sampleHalfFill(cx,TEMPLATES.meta.stars.y,left);
+     if(kind==='gold')goldHalves++;
+     else if(kind==='white')whiteHalves++;
+   }
+ }
+ const min=goldHalves/2;
+ const max=(goldHalves+whiteHalves)/2;
+ return {min,max,white:whiteHalves/2};
+}
+function readStars(){
+ const cur=readStarStrip(TEMPLATES.meta.stars.current);
+ const pot=readStarStrip(TEMPLATES.meta.stars.potential);
+ return {
+   currentMin:cur.min,currentMax:cur.max,
+   potentialMin:pot.min,potentialMax:pot.max
+ };
+}
+function applyStarsToUI(stars){
+ starData=stars;
+ $('#currentStars').value=stars.currentMin??'';
+ $('#currentStarsMax').value=stars.currentMax??'';
+ $('#potentialStars').value=stars.potentialMin??'';
+ $('#potentialStarsMax').value=stars.potentialMax??'';
+ const cur=(stars.currentMin===stars.currentMax)?`${stars.currentMin}★`:`${stars.currentMin}~${stars.currentMax}★`;
+ const pot=(stars.potentialMin===stars.potentialMax)?`${stars.potentialMin}★`:`${stars.potentialMin}~${stars.potentialMax}★`;
+ $('#starSummary').textContent=`현재 ${cur} · 잠재 ${pot} · 흰색 별은 최대치 범위에만 포함`;
+}
 async function readMeta(localMode){
- const meta={name:'',age:'',position:'',nation:'',value:'',height:''};
+ const meta={name:'',age:'',position:'',nation:'',value:'',height:'',stars:null};
  try{
    meta.name=(await readText(TEMPLATES.meta.name,"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'",7))
      .replace(/[^A-Za-zÀ-ÿ .'\-]/g,'').trim();
-   const rawPos=await readText(TEMPLATES.meta.position,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()/,- ',7);
-   meta.position=localMode==='gk'?'GK':normalizePosition(rawPos);
 
-   const ageRR=await readNumberRobust(TEMPLATES.meta.age,15,50);
-   meta.age=ageRR.value===null?'':String(ageRR.value);
+   const posAttempts=await readTextMulti(TEMPLATES.meta.position,'ABCDEFGHIJKLMNOPQRSTUVWXYZ()/,- ');
+   meta.position=localMode==='gk'?'GK':bestNormalized(posAttempts,normalizePosition);
 
-   meta.nation=(await readText(TEMPLATES.meta.nation,'ABCDEFGHIJKLMNOPQRSTUVWXYZ',7))
-     .replace(/[^A-Z]/g,'').slice(0,3);
+   const ageAttempts=await readTextMulti(TEMPLATES.meta.age,'0123456789');
+   meta.age=bestNormalized(ageAttempts,parseAgeFromOCR);
 
-   meta.value=normalizeMarketValue(await readText(TEMPLATES.meta.value,'0123456789,.',7));
-   meta.height=normalizeHeight(await readText(TEMPLATES.meta.height,'0123456789',7));
+   const natAttempts=await readTextMulti(TEMPLATES.meta.nation,'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+   meta.nation=bestNormalized(natAttempts,x=>{
+     const t=String(x||'').toUpperCase().replace(/[^A-Z]/g,'');
+     return t.length>=3?t.slice(0,3):'';
+   });
+
+   const valAttempts=await readTextMulti(TEMPLATES.meta.value,'0123456789,.');
+   meta.value=bestNormalized(valAttempts,normalizeMarketValue);
+
+   const htAttempts=await readTextMulti(TEMPLATES.meta.height,'0123456789');
+   meta.height=bestNormalized(htAttempts,normalizeHeight);
+
+   meta.stars=readStars();
  }catch(e){
    console.warn('meta OCR',e);
  }
@@ -528,6 +689,13 @@ function mergeScanResults(rawResults){
    const vote=chooseVote(accepted.map(r=>r.meta[key]));
    $('#'+key).value=vote.value??'';
  }
+ const starFields=['currentMin','currentMax','potentialMin','potentialMax'];
+ const mergedStars={};
+ for(const k of starFields){
+   const vote=chooseVote(accepted.map(r=>r.meta.stars?.[k]).filter(v=>v!=null));
+   mergedStars[k]=vote.value==null?null:Number(vote.value);
+ }
+ applyStarsToUI(mergedStars);
 
  const names=new Set(accepted.flatMap(r=>Object.keys(r.attrs))),merged={},warns=new Set();
  for(const name of names){
@@ -676,8 +844,14 @@ function analyze(){
  rolesEl.innerHTML=scores.slice(0,6).map(([n,s])=>`<div class="role"><div>${n}<div class="meter"><i style="width:${s}%"></i></div></div><div class="score">${s}</div></div>`).join('');
  levelEl.textContent=`체감 레벨: ${levelFrom(best)} · 최고 역할 ${best}/100`;
 
- const cs=parseFloat($('#currentStars').value),ps=parseFloat($('#potentialStars').value);
- const stars=Number.isFinite(cs)||Number.isFinite(ps)?`\n별점 참고: 현재 ${Number.isFinite(cs)?cs:'?'} / 잠재 ${Number.isFinite(ps)?ps:'?'} (직접 입력값)`:'';
+ const cs=parseFloat($('#currentStars').value),csx=parseFloat($('#currentStarsMax').value);
+ const ps=parseFloat($('#potentialStars').value),psx=parseFloat($('#potentialStarsMax').value);
+ const fmtRange=(a,b)=>{
+   if(!Number.isFinite(a)&&!Number.isFinite(b))return '?';
+   if(!Number.isFinite(b)||a===b)return `${Number.isFinite(a)?a:b}`;
+   return `${a}~${b}`;
+ };
+ const stars=(Number.isFinite(cs)||Number.isFinite(ps))?`\n별점 참고: 현재 ${fmtRange(cs,csx)}★ / 잠재 ${fmtRange(ps,psx)}★ (흰 별 포함 범위)`:'';
  const growth=age==null?'나이 미입력':age<=20?'성장 여지 매우 큼':age<=23?'성장 여지 큼':age<=25?'성장 여지 있음':age<=28?'전성기 진입/유지 구간':'성장보다 현재 기량 중심';
  const pos=$('#position').value||(mode==='gk'?'GK':'미입력');
  const name=$('#name').value||'선수';
@@ -731,6 +905,9 @@ function drawBoxes(){
 file.addEventListener('change',async()=>{
  selectedFiles=[...file.files];
  if(!selectedFiles.length)return;
+ for(const id of ['currentStars','currentStarsMax','potentialStars','potentialStarsMax'])$('#'+id).value='';
+ $('#starSummary').textContent='판독 대기 중…';
+ starData={currentMin:null,currentMax:null,potentialMin:null,potentialMax:null};
 
  const {img,url}=await loadFileAsImage(selectedFiles[0]);
  srcImg=img;
@@ -762,7 +939,7 @@ $('#rescan').addEventListener('click',scanAttributes);
 $('#fieldBtn').addEventListener('click',()=>setMode('field'));
 $('#gkBtn').addEventListener('click',()=>setMode('gk'));
 $('#analyze').addEventListener('click',analyze);
-['position','value','height','currentStars','potentialStars'].forEach(id=>{
+['position','value','height','currentStars','currentStarsMax','potentialStars','potentialStarsMax'].forEach(id=>{
  const el=$('#'+id);
  if(el)el.addEventListener('change',validateMetaFields);
 });
